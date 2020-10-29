@@ -88,18 +88,16 @@ class OscarProxFunction(_BaseBatchProjection):
     eprint https://arxiv.org/abs/1705.07704
     """
 
-    def __init__(self, alpha=0, beta=1):
-        self.alpha = alpha
-        self.beta = beta
-
-    def project(self, x):
+    @classmethod
+    def project(cls, x, alpha, beta):
         x_np = x.detach().numpy().copy()
-        weights = _oscar_weights(self.alpha, self.beta, x_np.shape[0])
+        weights = _oscar_weights(alpha, beta, x_np.shape[0])
         y_hat_np = prox_owl(x_np, weights)
         y_hat = torch.from_numpy(y_hat_np)
         return y_hat
 
-    def project_jv(self, dout, y_hat):
+    @classmethod
+    def project_jv(cls, dout, y_hat):
         return oscar_prox_jv(y_hat, dout)
 
 
@@ -109,9 +107,8 @@ class Oscarmax(nn.Module):
         super(Oscarmax, self).__init__()
 
     def forward(self, x, lengths=None):
-        oscar_prox = OscarProxFunction(beta=self.beta)
-        sparsemax = SparsemaxFunction()
-        return sparsemax(oscar_prox(x, lengths), lengths)
+        x = OscarProxFunction.apply(x, None, self.beta, lengths)
+        return SparsemaxFunction.apply(x, None, None, lengths)
 
 
 if __name__ == '__main__':

@@ -40,7 +40,7 @@ def test_jv(alpha, beta):
     for _ in range(30):
         x = Variable(torch.randn(15))
         dout = torch.randn(15)
-        y_hat = OscarProxFunction(alpha=alpha, beta=beta)(x).data
+        y_hat = OscarProxFunction.apply(x, alpha, beta).data
 
         ref = _oscar_prox_jacobian(y_hat, dout)
         din = oscar_prox_jv(y_hat, dout)
@@ -55,5 +55,5 @@ def test_finite_diff(alpha, beta):
 
     for _ in range(30):
         x = Variable(torch.randn(20), requires_grad=True)
-        func = OscarProxFunction(alpha, beta=beta)
-        assert gradcheck(func, (x,), eps=1e-5, atol=1e-3)
+        func = OscarProxFunction.apply
+        assert gradcheck(func, (x, alpha, beta), eps=1e-5, atol=1e-3)

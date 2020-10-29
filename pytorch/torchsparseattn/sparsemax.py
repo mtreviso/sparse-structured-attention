@@ -32,21 +32,22 @@ def sparsemax_grad(dout, w_star):
     masked -= masked.sum() / nnz
     out = dout.new(dout.size()).zero_()
     out[supp] = masked
-    return(out)
+    return out
 
 
 class SparsemaxFunction(_BaseBatchProjection):
 
-    def project(self, x):
-        return project_simplex(x)
+    @classmethod
+    def project(cls, x):
+        return project_simplex(x).squeeze()
 
-    def project_jv(self, dout, y_star):
-        return sparsemax_grad(dout, y_star)
+    @classmethod
+    def project_jv(cls, dout, y_star):
+        return sparsemax_grad(dout, y_star).squeeze()
 
 
 class Sparsemax(nn.Module):
 
     def forward(self, x, lengths=None):
-        sparsemax = SparsemaxFunction()
-        return sparsemax(x, lengths)
+        return SparsemaxFunction.apply(x, None, None, lengths)
 

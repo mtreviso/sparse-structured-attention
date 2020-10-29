@@ -1,52 +1,56 @@
-from torch import nn
+import torch
+
 from torch import autograd as ta
+
 
 class _BaseBatchProjection(ta.Function):
     """Applies a sample-wise normalizing projection over a batch."""
 
-    def forward(self, x, lengths=None):
-
+    @classmethod
+    def forward(cls, ctx, x, alpha=None, beta=None, lengths=None):
         requires_squeeze = False
         if x.dim() == 1:
             x = x.unsqueeze(0)
             requires_squeeze = True
 
         n_samples, max_dim = x.size()
+        y_star = torch.zeros_like(x)
 
         has_lengths = True
         if lengths is None:
             has_lengths = False
             lengths = [max_dim] * n_samples
 
-        y_star = x.new()
-        y_star.resize_as_(x)
-        y_star.zero_()
-
         for i in range(n_samples):
-            y_star[i, :lengths[i]] = self.project(x[i, :lengths[i]])
+            if alpha is None and beta is None:
+                y_star[i, :lengths[i]] = cls.project(x[i, :lengths[i]])
+            elif alpha is not None and beta is None:
+                y_star[i, :lengths[i]] = cls.project(x[i, :lengths[i]], alpha)
+            elif alpha is not None and beta is not None:
+                y_star[i, :lengths[i]] = cls.project(x[i, :lengths[i]], alpha, beta)
 
         if requires_squeeze:
-            y_star = y_star.squeeze()
+            y_star = y_star.squeeze(0)
 
-        self.mark_non_differentiable(y_star)
+        # ctx.mark_non_differentiable(y_star)
         if has_lengths:
-            self.mark_non_differentiable(lengths)
-            self.save_for_backward(y_star, lengths)
+            ctx.mark_non_differentiable(lengths)
+            ctx.save_for_backward(y_star, lengths)
         else:
-            self.save_for_backward(y_star)
+            ctx.save_for_backward(y_star)
 
         return y_star
 
-    def backward(self, dout):
-
-        if not self.needs_input_grad[0]:
+    @classmethod
+    def backward(cls, ctx, dout):
+        if not ctx.needs_input_grad[0]:
             return None
 
-        if len(self.needs_input_grad) > 1 and self.needs_input_grad[1]:
+        if len(ctx.needs_input_grad) > 1 and ctx.needs_input_grad[1]:
             raise ValueError("Cannot differentiate {} w.r.t. the "
-                             "sequence lengths".format(self.__name__))
+                             "sequence lengths".format(ctx.__name__))
 
-        saved = self.saved_tensors
+        saved = ctx.saved_tensors
         if len(saved) == 2:
             y_star, lengths = saved
         else:
@@ -60,18 +64,14 @@ class _BaseBatchProjection(ta.Function):
             requires_squeeze = True
 
         n_samples, max_dim = y_star.size()
-        din = dout.new()
-        din.resize_as_(y_star)
-        din.zero_()
-
+        din = torch.zeros_like(y_star)
         if lengths is None:
             lengths = [max_dim] * n_samples
 
         for i in range(n_samples):
-            din[i, :lengths[i]] = self.project_jv(dout[i, :lengths[i]],
-                                                  y_star[i, :lengths[i]])
+            din[i, :lengths[i]] = cls.project_jv(dout[i, :lengths[i]], y_star[i, :lengths[i]])
 
         if requires_squeeze:
-            din = din.squeeze()
+            din = din.squeeze(0)
 
-        return din, None
+        return din, None, None, None

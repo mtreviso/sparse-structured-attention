@@ -45,8 +45,7 @@ def test_jv(alpha):
         x = Variable(torch.randn(15))
         dout = torch.randn(15)
 
-        y_hat = FusedProxFunction(alpha=alpha)(x).data
-
+        y_hat = FusedProxFunction.apply(x, alpha).data
 
         ref = _fused_prox_jacobian(y_hat, dout)
         din_slow = fused_prox_jv_slow(y_hat, dout)
@@ -62,5 +61,5 @@ def test_finite_diff(alpha):
 
     for _ in range(30):
         x = Variable(torch.randn(20), requires_grad=True)
-        func = FusedProxFunction(alpha=alpha)
-        assert gradcheck(func, (x,), eps=1e-4, atol=1e-3)
+        func = FusedProxFunction.apply
+        assert gradcheck(func, (x,alpha,), eps=1e-4, atol=1e-3)
